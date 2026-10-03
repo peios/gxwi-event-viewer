@@ -104,9 +104,11 @@ impl Space {
     }
 
     /// Whether a pattern of this part may be removed: not a wildcard, which
-    /// is load-bearing, and not the administrative descriptor.
+    /// is load-bearing, not the administrative descriptor, and not the
+    /// one eventd keeps for its own health metrics, which it makes again
+    /// at its next start (eventd TRM §5.7).
     fn removable(self, pattern: &str) -> bool {
-        self != Space::Admin && pattern != "*"
+        self != Space::Admin && pattern != "*" && (self, pattern) != (Space::Metrics, "eventd")
     }
 }
 
@@ -326,7 +328,11 @@ pub fn add(space: Space, pattern: &str) -> Result<(), String> {
 
 pub fn remove(space: Space, pattern: &str) -> Result<(), String> {
     if !space.removable(pattern) {
-        return Err("This one cannot be removed: eventd would let nobody read what it covers.".into());
+        return Err(if pattern == "*" || space == Space::Admin {
+            "This one cannot be removed: eventd would let nobody read what it covers.".into()
+        } else {
+            "This one cannot be removed: eventd makes it again when it next starts.".into()
+        });
     }
     let key = Key::open(None, &space.path(pattern), KeyAccess::DELETE, OpenFlags::empty()).map_err(|error| refused(&error))?;
     key.delete_key(None, None).map_err(|error| refused(&error))
@@ -387,6 +393,8 @@ mod tests {
     fn the_wildcards_and_the_administrative_descriptor_stay() {
         assert!(!Space::Logs.removable("*"));
         assert!(!Space::Admin.removable("Admin"));
+        assert!(!Space::Metrics.removable("eventd"));
+        assert!(Space::Metrics.removable("cpu"));
         assert!(Space::Logs.removable("sshd"));
         assert_eq!(Space::Logs.covers("sshd"), "Logs from sshd, and from what runs under it");
         assert_eq!(Space::Admin.path("Admin"), ADMIN_KEY);
