@@ -328,6 +328,7 @@ dependencies = [
  "eventd-client",
  "jiff",
  "libgxwi",
+ "peios",
  "serde_json",
 ]
 

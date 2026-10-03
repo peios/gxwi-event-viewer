@@ -26,6 +26,7 @@ use eventd_client::access::{self, Namespace, Readable};
 use eventd_client::{Error, Record, Tail, Tailed, Value};
 use libgxwi::{Facts, Fields, Live, Surface, escape};
 
+use crate::metrics::Metrics;
 use crate::query::{Filter, Kind, PAGE, Range, SOURCES};
 use crate::words::{self, Clock};
 
@@ -64,7 +65,16 @@ enum Following {
     Stopped(String),
 }
 
+/// Which tab is shown: records, logs or events by `kind`, or metrics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Tab {
+    Records,
+    Metrics,
+}
+
 pub struct Viewer {
+    tab: Tab,
+    pub metrics: Metrics,
     kind: Kind,
     /// What the records shown were asked for with.
     filter: Filter,
@@ -98,6 +108,8 @@ pub struct Viewer {
 impl Viewer {
     pub fn new(kind: Kind) -> Viewer {
         Viewer {
+            tab: Tab::Records,
+            metrics: Metrics::new(),
             kind,
             filter: Filter::new(kind),
             rows: VecDeque::new(),
@@ -129,6 +141,16 @@ impl Viewer {
         self.read_policy();
     }
 
+    /// The window as it opens on the metrics.
+    pub fn fill_metrics(&mut self, fields: &mut Fields) {
+        fields.set("range", Range::DEFAULT.name());
+        self.filter.range = Range::DEFAULT;
+        self.tab = Tab::Metrics;
+        self.metrics.open(&self.window, &self.socket, fields);
+        self.retitle();
+        self.read_policy();
+    }
+
     /// What the fields say, for the kind shown.
     fn chosen(&self, fields: &Fields) -> Filter {
         let mut filter = Filter::new(self.kind);
@@ -142,13 +164,21 @@ impl Viewer {
     }
 
     /// Asks again with what the fields say, from the newest.
+    /// Names the window after what it shows.
+    fn retitle(&self) {
+        if let Some(window) = self.window.upgrade() {
+            match (self.tab, self.metrics.dashboard()) {
+                (Tab::Metrics, Some(dashboard)) => window.retitle(&format!("Event Viewer: {}", dashboard.name)),
+                _ => window.retitle(&title(&self.filter)),
+            }
+        }
+    }
+
     fn apply(&mut self, fields: &Fields) {
         let filter = self.chosen(fields);
         let suggest = filter.range != self.filter.range || filter.kind != self.filter.kind || self.suggestions.is_empty();
         self.filter = filter;
-        if let Some(window) = self.window.upgrade() {
-            window.retitle(&title(&self.filter));
-        }
+        self.retitle();
         self.restart();
         if suggest {
             self.suggest();
@@ -373,13 +403,23 @@ impl Viewer {
 
     fn bar(&self, facts: &Facts) -> String {
         let fields = facts.fields;
-        let tab = |kind: Kind, label: &str| {
-            format!(
-                "<button type=\"button\" class=\"tab\" fx-click=\"kind\" fx-value-kind=\"{}\" aria-pressed=\"{}\">{label}</button>",
-                kind.name(),
-                self.kind == kind
-            )
+        let tab = |name: &str, label: &str, pressed: bool| {
+            format!("<button type=\"button\" class=\"tab\" fx-click=\"kind\" fx-value-kind=\"{name}\" aria-pressed=\"{pressed}\">{label}</button>")
         };
+        let records = |kind: Kind| self.tab == Tab::Records && self.kind == kind;
+        let tabs = format!(
+            "<span class=\"tabs\" role=\"group\" aria-label=\"Show\">{}{}{}</span>",
+            tab(Kind::Events.name(), "Events", records(Kind::Events)),
+            tab("metrics", "Metrics", self.tab == Tab::Metrics),
+            tab(Kind::Logs.name(), "Logs", records(Kind::Logs)),
+        );
+        if self.tab == Tab::Metrics {
+            return format!(
+                "<div class=\"bar\"><div class=\"top\">{tabs}\
+                 <button type=\"button\" class=\"refresh\" fx-click=\"refresh\" fx-key=\"F5\" title=\"Read every metric and chart again (F5)\">Refresh</button></div>{}</div>",
+                self.metrics.bar(fields)
+            );
+        }
         let ranges: String = Range::ALL
             .iter()
             .map(|range| format!("<option value=\"{}\"{}>{}</option>", range.name(), if fields.get("range") == range.name() { " selected" } else { "" }, range.words()))
@@ -408,12 +448,10 @@ impl Viewer {
             Following::Back | Following::Stopped(_) => "<button type=\"button\" class=\"live\" fx-click=\"resume\" title=\"Show the newest again, and follow what is recorded\">Newest</button>".to_string(),
         };
         format!(
-            "<div class=\"bar\"><div class=\"top\"><span class=\"tabs\" role=\"group\" aria-label=\"Show\">{events}{logs}</span>\
+            "<div class=\"bar\"><div class=\"top\">{tabs}\
              {live}<button type=\"button\" class=\"refresh\" fx-click=\"refresh\" fx-key=\"F5\" title=\"Read again from the newest (F5)\">Refresh</button></div>\
              <form class=\"filters\" fx-submit=\"apply\">{filters}{range}<button type=\"submit\">Apply</button></form>\
-             <datalist id=\"suggestions\">{suggestions}</datalist></div>",
-            logs = tab(Kind::Logs, "Logs"),
-            events = tab(Kind::Events, "Events"),
+             <datalist id=\"suggestions\">{suggestions}</datalist></div>"
         )
     }
 
@@ -612,6 +650,9 @@ impl Viewer {
 
 impl Live for Viewer {
     fn render(&self, facts: &Facts) -> String {
+        if self.tab == Tab::Metrics {
+            return format!("{}{}{}", self.bar(facts), self.metrics.body(facts.fields, &self.clock), self.metrics.footer());
+        }
         let (now, zone) = self.clock.now();
         let only = match self.kind {
             Kind::Logs => "Show only from here",
@@ -640,14 +681,56 @@ impl Live for Viewer {
                     self.picked = Some(row);
                 }
             }
+            "kind" if value["kind"].as_str() == Some("metrics") => {
+                if self.tab != Tab::Metrics {
+                    self.stop(Following::Paused);
+                    self.tab = Tab::Metrics;
+                    self.metrics.open(&self.window, &self.socket, fields);
+                    self.retitle();
+                }
+            }
             "kind" => {
                 if let Some(kind) = value["kind"].as_str().and_then(Kind::named)
-                    && kind != self.kind
+                    && (kind != self.kind || self.tab == Tab::Metrics)
                 {
+                    self.metrics.close();
+                    self.tab = Tab::Records;
                     self.kind = kind;
                     self.suggestions.clear();
                     self.apply(fields);
                 }
+            }
+            "refresh" if self.tab == Tab::Metrics => self.metrics.reread(&self.window, &self.socket),
+            "add" => {
+                let (Some(metric), Some(metric_type)) = (value["metric"].as_str(), value["type"].as_str()) else { return };
+                self.metrics.add(metric, metric_type);
+                self.metrics.ask(&self.window, &self.socket);
+            }
+            "chart" => {
+                let (Some(chart), Some(set)) = (value["chart"].as_str().and_then(|chart| chart.parse().ok()), value["set"].as_str()) else { return };
+                self.metrics.change(chart, set);
+                self.metrics.ask(&self.window, &self.socket);
+            }
+            "board-new" => {
+                self.metrics.create(fields);
+                self.metrics.ask(&self.window, &self.socket);
+                self.retitle();
+            }
+            "edit" => {
+                if let Some(chart) = value["chart"].as_str().and_then(|chart| chart.parse().ok()) {
+                    self.metrics.edit(chart, fields);
+                }
+            }
+            "board-delete-ask" => self.metrics.ask_delete(true),
+            "board-keep" => self.metrics.ask_delete(false),
+            "board-delete" => {
+                self.metrics.delete(fields);
+                self.metrics.ask(&self.window, &self.socket);
+                self.retitle();
+            }
+            "rename" => {
+                self.metrics.rename(fields);
+                self.retitle();
             }
             "apply" => self.apply(fields),
             "older" => self.older(),
@@ -665,8 +748,22 @@ impl Live for Viewer {
     /// A checkbox or a list applies as soon as it changes; what is typed
     /// waits for Enter.
     fn input(&mut self, name: &str, fields: &mut Fields) {
-        if matches!(name, "errors" | "range" | "source") {
-            self.apply(fields);
+        match name {
+            "errors" | "range" | "source" if self.tab == Tab::Records => self.apply(fields),
+            "board" if self.tab == Tab::Metrics => {
+                self.metrics.switch(fields);
+                self.metrics.ask(&self.window, &self.socket);
+                self.retitle();
+            }
+            "span" if self.tab == Tab::Metrics => {
+                self.metrics.span(fields);
+                self.metrics.ask(&self.window, &self.socket);
+            }
+            "edit-transform" | "edit-function" | "edit-lines" if self.tab == Tab::Metrics => {
+                self.metrics.edited(name, fields);
+                self.metrics.ask(&self.window, &self.socket);
+            }
+            _ => {}
         }
     }
 }
@@ -734,7 +831,7 @@ fn tail(window: &Weak<Surface<Viewer>>, generation: &AtomicU64, mine: u64, socke
 }
 
 /// Why eventd gave nothing, in words.
-fn trouble(error: &Error) -> String {
+pub(crate) fn trouble(error: &Error) -> String {
     match error {
         Error::Connect { source, .. } if source.kind() == std::io::ErrorKind::PermissionDenied => {
             "eventd, which keeps the logs and events, doesn't let you ask it anything.".into()

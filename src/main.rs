@@ -1,8 +1,9 @@
 //! Event Viewer: what eventd has recorded on this machine, the events of
-//! its kernel and programs and the logs of its services, newest first and
-//! live. It opens on the events. With `--logs ORIGIN` it opens instead on
-//! what one service, or whatever else logs as ORIGIN, has written, which is
-//! what Services Manager's Logs button asks for.
+//! its kernel and programs, its metrics, and the logs of its services,
+//! newest first and live. It opens on the events. With `--logs ORIGIN` it
+//! opens instead on what one service, or whatever else logs as ORIGIN, has
+//! written, which is what Services Manager's Logs button asks for; with
+//! `--metrics`, on the person's dashboards of metrics.
 //!
 //! It asks eventd, on its query socket, as whoever is looking: what it
 //! shows is what eventd lets them read, and it says what eventd keeps from
@@ -12,6 +13,9 @@ use std::sync::Arc;
 
 use libgxwi::App;
 
+mod chart;
+mod dashboards;
+mod metrics;
 mod query;
 mod viewer;
 mod words;
@@ -25,11 +29,12 @@ libgxwi::icon!(b"dev.peios.gxwi-event-viewer");
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let (kind, origin) = match arguments.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
-        [] | ["--events"] => (Kind::Events, None),
-        ["--logs", origin] => (Kind::Logs, Some(origin.to_string())),
+    let (kind, origin, metrics) = match arguments.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        [] | ["--events"] => (Kind::Events, None, false),
+        ["--logs", origin] => (Kind::Logs, Some(origin.to_string()), false),
+        ["--metrics"] => (Kind::Events, None, true),
         _ => {
-            eprintln!("gxwi-event-viewer: usage: gxwi-event-viewer [--events | --logs ORIGIN]");
+            eprintln!("gxwi-event-viewer: usage: gxwi-event-viewer [--events | --metrics | --logs ORIGIN]");
             std::process::exit(64);
         }
     };
@@ -48,7 +53,11 @@ fn main() {
     let aside = Arc::downgrade(&window);
     window.update(|viewer, fields| {
         viewer.window = aside;
-        viewer.fill(fields, origin.as_deref());
+        if metrics {
+            viewer.fill_metrics(fields);
+        } else {
+            viewer.fill(fields, origin.as_deref());
+        }
     });
     if let Err(e) = app.run() {
         eprintln!("gxwi-event-viewer: {e}");

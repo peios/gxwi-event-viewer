@@ -13,6 +13,9 @@ libgxwi = { path = "../gxwi/libgxwi" }
 # libgxwi, which it must: `peios-sys` links libpeios, and a program can hold
 # only one of it.
 eventd-client = { path = "../eventd/eventd-client" }
+# The person's registry, where their dashboards are kept. The revision
+# eventd-client pins.
+peios = { git = "https://github.com/peios/peios-rs.git", rev = "3dffee949a457509078ffc2f423613de330b5401", package = "peios" }
 # A record's time, said on this machine's clock.
 jiff = "0.2.29"
 

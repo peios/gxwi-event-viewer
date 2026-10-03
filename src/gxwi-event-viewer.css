@@ -192,8 +192,159 @@ body {
 .older:hover { border-color: var(--border-strong); }
 .older:focus-visible, .link:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
 
-/* Narrow: the details pane goes. */
+/* Metrics: every metric beside the person's dashboard of charts, two
+   columns of one grid as the records and their details are. */
+.catalogue { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--border-default); }
+.catalogue input {
+    flex: none;
+    height: var(--control-sm);
+    margin: var(--space-2) var(--space-2) var(--space-1);
+    box-sizing: border-box;
+    padding: 0 var(--space-2);
+    font: inherit;
+    color: inherit;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+}
+.catalogue input:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
+.catalogue .hint { flex: none; margin: 0 var(--space-3) var(--space-1); font-size: 11px; color: var(--text-muted); }
+.catalogue .names { flex: 1; min-height: 0; margin: 0; padding: 0 0 var(--space-2); overflow-y: auto; list-style: none; }
+.catalogue .metric {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 var(--space-2);
+    width: 100%;
+    padding: var(--space-1) var(--space-3);
+    text-align: left;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-primary);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+.catalogue .metric:hover { background: var(--surface-2); }
+.catalogue .metric:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: -2px; }
+.catalogue .metric .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.catalogue .metric .kind { align-self: center; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+.catalogue .metric .latest { grid-column: 1 / -1; font: 500 11px/1.4 var(--font-mono); color: var(--text-secondary); }
+
+.board { min-width: 0; min-height: 0; padding: var(--space-3); overflow-y: auto; }
+.board > .note { margin: 0 0 var(--space-3); }
+.charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-3); }
+
+.chart {
+    min-width: 0;
+    margin: 0;
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    background: var(--surface-2);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md, var(--radius-sm));
+}
+.chart figcaption { display: flex; align-items: baseline; gap: var(--space-2); margin-bottom: var(--space-2); }
+.chart .name { flex: none; max-width: 60%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+.chart .how { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; color: var(--text-muted); }
+.chart .more-button {
+    flex: none;
+    height: 22px;
+    padding: 0 var(--space-2);
+    font: inherit;
+    color: var(--text-secondary);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+.chart .more-button:hover { border-color: var(--border-strong); }
+.chart .more-button:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
+.chart .note { margin: 0 0 var(--space-2); }
+.chart .settings { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: 0 0 var(--space-3); padding: var(--space-2); font-size: 12px; background: var(--surface-1); border-radius: var(--radius-sm); }
+.chart .settings label { display: flex; align-items: center; gap: var(--space-1); color: var(--text-secondary); }
+.chart .settings select, .chart .settings button {
+    height: var(--control-sm);
+    padding: 0 var(--space-2);
+    font: inherit;
+    color: var(--text-primary);
+    background: var(--bg-sunken);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+}
+.chart .settings button { background: var(--surface-2); border-color: var(--border-default); cursor: pointer; }
+.chart .settings button:hover:not(:disabled) { border-color: var(--border-strong); }
+.chart .settings button:disabled { opacity: 0.5; cursor: default; }
+.chart .settings .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); width: 100%; }
+.chart .settings .actions button:last-child { margin-left: auto; }
+.chart .settings select:focus-visible, .chart .settings button:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
+.chart .more-button[aria-expanded="true"] { border-color: var(--border-strong); background: var(--surface-1); }
+.chart .more, .chart .trouble, .no-samples { display: flex; align-items: center; justify-content: center; height: 150px; margin: 0; font-size: 12px; color: var(--text-muted); }
+.chart .trouble { color: var(--danger-text); text-align: center; }
+
+/* A chart: the values up its left, the times along its foot, the lines
+   stretched over the area, and over them a column per window. */
+.plot { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 150px auto; column-gap: var(--space-2); }
+.plot .y { display: flex; flex-direction: column; justify-content: space-between; font: 500 10px/1 var(--font-mono); text-align: right; color: var(--text-muted); }
+.plot .area { position: relative; border-bottom: 1px solid var(--border-default); }
+.plot .x { grid-column: 2; display: flex; justify-content: space-between; font: 500 10px/1.8 var(--font-mono); color: var(--text-muted); }
+.lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lines .grid { stroke: var(--border-default); stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
+.lines polyline { fill: none; stroke: var(--line); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+
+/* The column the pointer is over says every line's value in its window,
+   beside it, on whichever side has room. */
+.cols { position: absolute; inset: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.col { position: relative; }
+.col:hover { background: color-mix(in srgb, var(--text-primary) 8%, transparent); }
+.col .tip {
+    display: none;
+    position: absolute;
+    top: 4px;
+    left: 100%;
+    z-index: 2;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 160px;
+    max-width: 300px;
+    padding: var(--space-2);
+    font-size: 11px;
+    white-space: nowrap;
+    background: var(--surface-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+    pointer-events: none;
+}
+.col.right .tip { left: auto; right: 100%; }
+.col:hover .tip { display: flex; }
+.tip .at { font-family: var(--font-mono); color: var(--text-muted); }
+.tip b { font-weight: 500; color: var(--text-secondary); }
+.tip span[class^="k"]::before, .legend li::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 2px;
+    background: var(--line);
+}
+.legend { display: flex; flex-wrap: wrap; gap: 2px var(--space-3); margin: var(--space-2) 0 0; padding: 0; list-style: none; font-size: 11px; color: var(--text-secondary); }
+.legend .left-out { color: var(--text-muted); }
+.legend .left-out::before { display: none; }
+
+/* A line's colour, by its place on the chart. */
+.k0 { --line: #3b82f6; }
+.k1 { --line: #f59e0b; }
+.k2 { --line: #10b981; }
+.k3 { --line: #ef4444; }
+.k4 { --line: #8b5cf6; }
+.k5 { --line: #06b6d4; }
+.k6 { --line: #ec4899; }
+.k7 { --line: #84cc16; }
+
+/* Narrow: the details pane goes, and the metrics stack over the charts. */
 @media (max-width: 700px) {
     .body { grid-template-columns: minmax(0, 1fr); }
     .details { display: none; }
+    .body.metrics { grid-template-rows: minmax(0, 30%) minmax(0, 1fr); }
+    .catalogue { border-right: none; border-bottom: 1px solid var(--border-default); }
 }
