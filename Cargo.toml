@@ -19,6 +19,9 @@ peios = { git = "https://github.com/peios/peios-rs.git", rev = "3cf23f68d40c4adf
 # eventd's read policy, opened in the permissions editor, and who a SID is,
 # said as the editor says it.
 gxwi-sd-editor = { path = "../gxwi-sd-editor", default-features = false, features = ["names", "splice"] }
+# eventd's regman page, read as regman reads it. Beside this checkout until
+# it is pushed.
+libregman = { path = "../peiosutils/src/uu/regman/libregman" }
 # A record's time, said on this machine's clock.
 jiff = "0.2.29"
 

@@ -15,6 +15,7 @@
 
 use std::collections::BTreeMap;
 
+use libregman::fragment;
 use peios::registry::{Key, KeyAccess, OpenFlags, ValueType};
 
 pub const REGMAN: &str = "/usr/share/regman/eventd.regman";
@@ -56,44 +57,30 @@ impl Setting {
 }
 
 /// eventd's values, from its regman page's text: the records documenting
-/// one value of `Machine\System\eventd`.
+/// one value of `Machine\System\eventd`, as regman's own reader parses them.
 pub fn documented(page: &str) -> Vec<Setting> {
-    // A record is a fence line, a header to the first blank line, and a
-    // body to the next fence.
-    let mut records: Vec<Vec<&str>> = Vec::new();
-    for line in page.lines() {
-        if line.starts_with("--- ") {
-            records.push(Vec::new());
-        } else if let Some(record) = records.last_mut() {
-            record.push(line);
-        }
-    }
-    let mut settings = Vec::new();
-    for record in records {
-        let mut lines = record.into_iter();
-        let mut header: BTreeMap<String, String> = BTreeMap::new();
-        for line in lines.by_ref() {
-            if line.trim().is_empty() {
-                break;
-            }
-            if let Some((key, value)) = line.split_once(':') {
-                header.insert(key.trim().to_ascii_lowercase(), value.trim().to_string());
-            }
-        }
-        let body: Vec<&str> = lines.collect();
-        let Some(canonical) = header.get("canonical") else { continue };
-        let Some(name) = canonical.strip_prefix(KEY).and_then(|rest| rest.strip_prefix(' ')) else { continue };
-        let about = body.join("\n").trim().split("\n\n").next().unwrap_or_default().split_whitespace().collect::<Vec<_>>().join(" ");
-        let kind = match header.get("type").map(String::as_str) {
-            Some("REG_DWORD") => Kind::Dword,
-            Some("REG_QWORD") => Kind::Qword,
-            Some("REG_SZ") => Kind::Text,
-            _ => Kind::Other,
-        };
-        let field = |name: &str| header.get(name).cloned().unwrap_or_default();
-        settings.push(Setting { name: name.trim().into(), kind, default: field("default"), valid: field("valid"), applies: field("applies"), about });
-    }
-    settings
+    let (records, _) = fragment::parse(page);
+    records
+        .into_iter()
+        .filter_map(|record| {
+            let name = record.canonical.strip_prefix(KEY)?.strip_prefix(' ')?.trim().to_string();
+            let about = record.body.trim().split("\n\n").next().unwrap_or_default().split_whitespace().collect::<Vec<_>>().join(" ");
+            let kind = match record.type_.as_deref() {
+                Some("REG_DWORD") => Kind::Dword,
+                Some("REG_QWORD") => Kind::Qword,
+                Some("REG_SZ") => Kind::Text,
+                _ => Kind::Other,
+            };
+            Some(Setting {
+                name,
+                kind,
+                default: record.default.unwrap_or_default(),
+                valid: record.valid.unwrap_or_default(),
+                applies: record.applies.unwrap_or_default(),
+                about,
+            })
+        })
+        .collect()
 }
 
 /// `A to B`, or `A–B`, as numbers.
