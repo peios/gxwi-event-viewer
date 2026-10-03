@@ -27,6 +27,8 @@ use eventd_client::{Error, Record, Tail, Tailed, Value};
 use libgxwi::{Facts, Fields, Live, Surface, escape};
 
 use crate::metrics::Metrics;
+use crate::policy::Space;
+use crate::settings_tab::SettingsTab;
 use crate::query::{Filter, Kind, PAGE, Range, SOURCES};
 use crate::words::{self, Clock};
 
@@ -65,16 +67,19 @@ enum Following {
     Stopped(String),
 }
 
-/// Which tab is shown: records, logs or events by `kind`, or metrics.
+/// Which tab is shown: records, logs or events by `kind`, metrics, or
+/// eventd's settings and read policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Tab {
     Records,
     Metrics,
+    Settings,
 }
 
 pub struct Viewer {
     tab: Tab,
     pub metrics: Metrics,
+    pub settings: SettingsTab,
     kind: Kind,
     /// What the records shown were asked for with.
     filter: Filter,
@@ -110,6 +115,7 @@ impl Viewer {
         Viewer {
             tab: Tab::Records,
             metrics: Metrics::new(),
+            settings: SettingsTab::new(),
             kind,
             filter: Filter::new(kind),
             rows: VecDeque::new(),
@@ -169,9 +175,38 @@ impl Viewer {
         if let Some(window) = self.window.upgrade() {
             match (self.tab, self.metrics.dashboard()) {
                 (Tab::Metrics, Some(dashboard)) => window.retitle(&format!("Event Viewer: {}", dashboard.name)),
+                (Tab::Settings, _) => window.retitle("Event Viewer: Settings"),
                 _ => window.retitle(&title(&self.filter)),
             }
         }
+    }
+
+    /// The window as it opens on eventd's settings.
+    pub fn fill_settings(&mut self, fields: &mut Fields) {
+        fields.set("range", Range::DEFAULT.name());
+        self.filter.range = Range::DEFAULT;
+        self.tab = Tab::Settings;
+        self.settings.read(&self.window);
+        self.retitle();
+        self.read_policy();
+    }
+
+    /// The read policy changed here: what each tab says of it is read
+    /// again.
+    pub fn policy_changed(&mut self) {
+        self.settings.read_policy(&self.window);
+        self.metrics.read_policy(&self.window);
+        self.read_policy();
+    }
+
+    /// Leaves whatever tab is shown for `tab`, stopping what it asks for.
+    fn leave(&mut self, tab: Tab) {
+        match self.tab {
+            Tab::Records => self.stop(Following::Paused),
+            Tab::Metrics => self.metrics.close(),
+            Tab::Settings => {}
+        }
+        self.tab = tab;
     }
 
     fn apply(&mut self, fields: &Fields) {
@@ -408,11 +443,18 @@ impl Viewer {
         };
         let records = |kind: Kind| self.tab == Tab::Records && self.kind == kind;
         let tabs = format!(
-            "<span class=\"tabs\" role=\"group\" aria-label=\"Show\">{}{}{}</span>",
+            "<span class=\"tabs\" role=\"group\" aria-label=\"Show\">{}{}{}{}</span>",
             tab(Kind::Events.name(), "Events", records(Kind::Events)),
             tab("metrics", "Metrics", self.tab == Tab::Metrics),
             tab(Kind::Logs.name(), "Logs", records(Kind::Logs)),
+            tab("settings", "Settings", self.tab == Tab::Settings),
         );
+        if self.tab == Tab::Settings {
+            return format!(
+                "<div class=\"bar\"><div class=\"top\">{tabs}\
+                 <button type=\"button\" class=\"refresh\" fx-click=\"refresh\" fx-key=\"F5\" title=\"Read eventd's settings and policy again (F5)\">Refresh</button></div></div>"
+            );
+        }
         if self.tab == Tab::Metrics {
             return format!(
                 "<div class=\"bar\"><div class=\"top\">{tabs}\
@@ -653,6 +695,9 @@ impl Live for Viewer {
         if self.tab == Tab::Metrics {
             return format!("{}{}{}", self.bar(facts), self.metrics.body(facts.fields, &self.clock), self.metrics.footer());
         }
+        if self.tab == Tab::Settings {
+            return format!("{}{}{}", self.bar(facts), self.settings.body(), self.settings.footer());
+        }
         let (now, zone) = self.clock.now();
         let only = match self.kind {
             Kind::Logs => "Show only from here",
@@ -683,24 +728,52 @@ impl Live for Viewer {
             }
             "kind" if value["kind"].as_str() == Some("metrics") => {
                 if self.tab != Tab::Metrics {
-                    self.stop(Following::Paused);
-                    self.tab = Tab::Metrics;
+                    self.leave(Tab::Metrics);
                     self.metrics.open(&self.window, &self.socket, fields);
+                    self.retitle();
+                }
+            }
+            "kind" if value["kind"].as_str() == Some("settings") => {
+                if self.tab != Tab::Settings {
+                    self.leave(Tab::Settings);
+                    self.settings.read(&self.window);
                     self.retitle();
                 }
             }
             "kind" => {
                 if let Some(kind) = value["kind"].as_str().and_then(Kind::named)
-                    && (kind != self.kind || self.tab == Tab::Metrics)
+                    && (kind != self.kind || self.tab != Tab::Records)
                 {
-                    self.metrics.close();
-                    self.tab = Tab::Records;
+                    self.leave(Tab::Records);
                     self.kind = kind;
                     self.suggestions.clear();
                     self.apply(fields);
                 }
             }
             "refresh" if self.tab == Tab::Metrics => self.metrics.reread(&self.window, &self.socket),
+            "refresh" if self.tab == Tab::Settings => self.settings.read(&self.window),
+            "setting" | "setting-default" => {
+                let Some(setting) = value["name"].as_str() else { return };
+                if name == "setting" {
+                    self.settings.set(setting, fields, &self.window);
+                } else {
+                    self.settings.unset(setting, &self.window);
+                }
+            }
+            "policy-edit" | "policy-remove-ask" | "policy-remove" => {
+                let (Some(space), Some(pattern)) = (value["space"].as_str().and_then(Space::named), value["pattern"].as_str()) else { return };
+                match name {
+                    "policy-edit" => self.settings.edit(space, pattern, &self.window),
+                    "policy-remove-ask" => self.settings.ask_remove(space, pattern),
+                    _ => self.settings.remove(space, pattern, &self.window),
+                }
+            }
+            "policy-keep" => self.settings.keep(),
+            "policy-add" => {
+                if let Some(space) = value["space"].as_str().and_then(Space::named) {
+                    self.settings.add(space, fields, &self.window);
+                }
+            }
             "add" => {
                 let (Some(metric), Some(metric_type)) = (value["metric"].as_str(), value["type"].as_str()) else { return };
                 self.metrics.add(metric, metric_type);

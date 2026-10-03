@@ -42,8 +42,8 @@ const CATALOGUE: [(&str, &str); 3] = [
 pub struct Metric {
     pub name: String,
     pub metric_type: String,
-    /// Each series' labels and latest reading.
-    pub series: Vec<(String, Option<Reading>)>,
+    /// Each series' labels, latest reading, and when that was.
+    pub series: Vec<(String, Option<Reading>, Option<i64>)>,
 }
 
 /// What a chart last read.
@@ -146,7 +146,7 @@ impl Metrics {
         });
     }
 
-    fn read_policy(&self, window: &Weak<Surface<Viewer>>) {
+    pub fn read_policy(&self, window: &Weak<Surface<Viewer>>) {
         let Some(window) = window.upgrade() else { return };
         std::thread::spawn(move || {
             let readable = access::readable(Namespace::Metrics);
@@ -345,20 +345,20 @@ impl Metrics {
     pub fn body(&self, fields: &Fields, clock: &Clock) -> String {
         format!(
             "<div class=\"split\" id=\"msplit\" fx-columns=\"260px minmax(0, 1fr)\"><div class=\"body metrics\">{catalogue}{board}</div></div>",
-            catalogue = self.listed(fields.get("find")),
+            catalogue = self.listed(fields.get("find"), i64::try_from(clock.now().0.as_nanosecond()).unwrap_or(i64::MAX)),
             board = self.board(clock),
         )
     }
 
     /// The catalogue, narrowed to names with `find` in them.
-    fn listed(&self, find: &str) -> String {
+    fn listed(&self, find: &str, now: i64) -> String {
         let find = find.trim().to_lowercase();
         let (items, said) = match &self.catalogue {
             None => (String::new(), "<p class=\"more\">Reading metrics…</p>".to_string()),
             Some(Err(why)) => (String::new(), format!("<p class=\"trouble\">{}</p>", escape(why))),
             Some(Ok(metrics)) => {
                 let shown: Vec<&Metric> = metrics.iter().filter(|metric| metric.name.to_lowercase().contains(&find)).collect();
-                let items: String = shown.iter().map(|metric| item(metric)).collect();
+                let items: String = shown.iter().map(|metric| item(metric, now)).collect();
                 let said = match (metrics.is_empty(), shown.is_empty()) {
                     (true, _) if self.readable == Some(Readable::Nothing) => "<p class=\"more\">You can't read metrics on this machine.</p>".into(),
                     (true, _) => "<p class=\"more\">No metrics have been recorded that you may read.</p>".into(),
@@ -512,31 +512,57 @@ fn selected(yes: bool) -> &'static str {
 
 /// One metric in the catalogue: its name, its type, and its latest value,
 /// or how many series it has, each of which its title says.
-fn item(metric: &Metric) -> String {
+fn item(metric: &Metric, now: i64) -> String {
     let unit = unit_of(&metric.name, Transform::None);
     let reading = |reading: &Option<Reading>| match reading {
         Some(Reading::Value(value)) => chart::say(*value, unit),
         Some(Reading::Overflow) => "above its highest bucket".into(),
         None => "nothing".into(),
     };
-    let latest = match metric.series.as_slice() {
-        [(_, only)] => reading(only),
-        series => format!("{} series", series.len()),
+    let stale = |at: &Option<i64>| at.filter(|at| now.saturating_sub(*at) > STALE);
+    let newest = metric.series.iter().filter_map(|(_, _, at)| *at).max();
+    let stopped = metric.series.iter().all(|(_, _, at)| stale(at).is_some());
+    let latest = match (metric.series.as_slice(), newest) {
+        (_, Some(newest)) if stopped => format!("nothing since {}", ago(now, newest)),
+        ([(_, only, _)], _) => reading(only),
+        (series, _) => format!("{} series", series.len()),
     };
     let title: String = metric
         .series
         .iter()
-        .map(|(labels, latest)| if labels.is_empty() { reading(latest) } else { format!("{labels}: {}", reading(latest)) })
+        .map(|(labels, latest, at)| {
+            let said = if labels.is_empty() { reading(latest) } else { format!("{labels}: {}", reading(latest)) };
+            match stale(at) {
+                Some(at) => format!("{said}, last recorded {}", ago(now, at)),
+                None => said,
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n");
     format!(
-        "<li id=\"m-{name}\"><button type=\"button\" class=\"metric\" fx-click=\"add\" fx-value-metric=\"{name}\" fx-value-type=\"{kind}\" title=\"{title}\">\
+        "<li id=\"m-{name}\"><button type=\"button\" class=\"metric{class}\" fx-click=\"add\" fx-value-metric=\"{name}\" fx-value-type=\"{kind}\" title=\"{title}\">\
          <span class=\"name\">{name}</span><span class=\"kind\">{kind}</span><span class=\"latest\">{latest}</span></button></li>",
+        class = if stopped { " stopped" } else { "" },
         name = escape(&metric.name),
         kind = escape(&metric.metric_type),
         title = escape(&title),
         latest = escape(&latest),
     )
+}
+
+/// How long since a series' last sample before it is said to have stopped.
+const STALE: i64 = 10 * 60 * 1_000_000_000;
+
+/// How long ago `at` was, in the largest whole unit.
+fn ago(now: i64, at: i64) -> String {
+    let seconds = now.saturating_sub(at) / 1_000_000_000;
+    let (count, unit) = match seconds {
+        ..60 => (seconds, "second"),
+        60..3_600 => (seconds / 60, "minute"),
+        3_600..86_400 => (seconds / 3_600, "hour"),
+        _ => (seconds / 86_400, "day"),
+    };
+    format!("{count} {unit}{} ago", if count == 1 { "" } else { "s" })
 }
 
 /// What a chart shows, in words.
@@ -592,7 +618,7 @@ fn catalogue(socket: &Path) -> Result<Vec<Metric>, String> {
         for record in eventd_client::query(socket, text).map_err(|error| trouble(&error))? {
             let Some(Value::String(name)) = record.get("name") else { continue };
             let metric = metrics.entry(name.clone()).or_insert_with(|| Metric { name: name.clone(), metric_type: metric_type.into(), series: Vec::new() });
-            metric.series.push((labels(&record), reading(&record)));
+            metric.series.push((labels(&record), reading(&record), words::timestamp(&record)));
         }
     }
     Ok(metrics.into_values().collect())
@@ -661,8 +687,15 @@ fn poll(window: &Weak<Surface<Viewer>>, generation: &AtomicU64, mine: u64, socke
                 answer(span, jiff::Timestamp::now().as_nanosecond() as i64, result)
             })
             .collect();
+        // The catalogue's latest values move with the charts.
+        let listed = catalogue(&socket);
         let Some(strong) = window.upgrade() else { return };
-        strong.update(|viewer, _| viewer.metrics.answered(mine, answers));
+        strong.update(|viewer, _| {
+            viewer.metrics.answered(mine, answers);
+            if viewer.metrics.generation.load(Ordering::SeqCst) == mine {
+                viewer.metrics.catalogue = Some(listed);
+            }
+        });
         drop(strong);
         let mut waited = Duration::ZERO;
         while waited < every {
@@ -739,18 +772,24 @@ mod tests {
 
     #[test]
     fn the_catalogue_says_each_metric_and_its_latest() {
-        let one = Metric { name: "eventd.store.bytes".into(), metric_type: "gauge".into(), series: vec![(String::new(), Some(Reading::Value(2048.0)))] };
-        let html = item(&one);
-        assert!(html.contains("fx-value-metric=\"eventd.store.bytes\" fx-value-type=\"gauge\""));
+        let now = 1_791_032_000 * SECOND;
+        let one = Metric { name: "eventd.store.bytes".into(), metric_type: "gauge".into(), series: vec![(String::new(), Some(Reading::Value(2048.0)), Some(now - SECOND))] };
+        let html = item(&one, now);
+        assert!(html.contains("class=\"metric\" fx-click=\"add\" fx-value-metric=\"eventd.store.bytes\" fx-value-type=\"gauge\""));
         assert!(html.contains("<span class=\"latest\">2 KiB</span>"));
         let two = Metric {
             name: "cpu.usage".into(),
             metric_type: "gauge".into(),
-            series: vec![("core=0".into(), Some(Reading::Value(3.0))), ("core=1".into(), None)],
+            series: vec![("core=0".into(), Some(Reading::Value(3.0)), Some(now)), ("core=1".into(), None, Some(now - 3 * 3_600 * SECOND))],
         };
-        let html = item(&two);
+        let html = item(&two, now);
         assert!(html.contains("<span class=\"latest\">2 series</span>"));
-        assert!(html.contains("title=\"core=0: 3\ncore=1: nothing\""));
+        assert!(html.contains("title=\"core=0: 3\ncore=1: nothing, last recorded 3 hours ago\""));
+        // Every series stopped: said so, and when.
+        let stopped = Metric { series: vec![("core=0".into(), Some(Reading::Value(3.0)), Some(now - 20 * 60 * SECOND))], ..two };
+        let html = item(&stopped, now);
+        assert!(html.contains("class=\"metric stopped\""));
+        assert!(html.contains("<span class=\"latest\">nothing since 20 minutes ago</span>"));
     }
 
     #[test]

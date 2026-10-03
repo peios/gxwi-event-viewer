@@ -229,6 +229,8 @@ body {
 .catalogue .metric .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .catalogue .metric .kind { align-self: center; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
 .catalogue .metric .latest { grid-column: 1 / -1; font: 500 11px/1.4 var(--font-mono); color: var(--text-secondary); }
+/* No sample for a while: still chartable, for its history. */
+.catalogue .metric.stopped .name, .catalogue .metric.stopped .latest { color: var(--text-muted); }
 
 .board { min-width: 0; min-height: 0; padding: var(--space-3); overflow-y: auto; }
 .board > .note { margin: 0 0 var(--space-3); }
@@ -340,6 +342,82 @@ body {
 .k5 { --line: #06b6d4; }
 .k6 { --line: #ec4899; }
 .k7 { --line: #84cc16; }
+
+/* Settings: eventd's values in groups, then who may read what. */
+.settings-page { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-3) var(--space-4) var(--space-4); }
+.settings-page > .note { margin: 0 0 var(--space-3); }
+.settings-page .group { max-width: 980px; margin: 0 0 var(--space-4); }
+.settings-page h2 { margin: 0 0 var(--space-2); font-size: 15px; }
+.settings-page h3 { margin: var(--space-3) 0 var(--space-2); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.settings-page .hint { margin: 0 0 var(--space-2); font-size: 12px; color: var(--text-muted); }
+
+.setting {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--border-default);
+}
+.setting .about .name { font-weight: 600; font-family: var(--font-mono); font-size: 12px; }
+.setting .about p { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary); }
+.setting .value { display: flex; align-items: center; gap: var(--space-2); margin: 0; align-self: start; }
+.setting .value input {
+    width: 12em;
+    height: var(--control-sm);
+    box-sizing: border-box;
+    padding: 0 var(--space-2);
+    font: 500 12px var(--font-mono);
+    color: inherit;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+}
+.setting .value input:disabled { opacity: 0.7; }
+.setting .value .unit { font-size: 12px; color: var(--text-muted); }
+.setting .value.text code { font-size: 12px; }
+.setting .facts { grid-column: 1 / -1; margin: 0; font-size: 11px; color: var(--text-muted); }
+.said { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--success-text, var(--text-secondary)); }
+.said.bad { color: var(--danger-text); }
+
+.settings-page button {
+    height: var(--control-sm);
+    padding: 0 var(--space-3);
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-primary);
+    background: var(--surface-2);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+.settings-page button:hover { border-color: var(--border-strong); }
+.settings-page button.link { height: auto; padding: 0; background: none; border: none; }
+.settings-page input:focus-visible, .settings-page button:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
+
+.patterns { margin: 0; padding: 0; list-style: none; }
+.pattern { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) 0; border-top: 1px solid var(--border-default); }
+.pattern .titled { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); }
+.pattern .covers { font-weight: 600; }
+.pattern code { font-size: 11px; color: var(--text-muted); }
+.pattern .grants { margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--text-secondary); }
+.pattern .grants b { font-weight: 600; color: var(--text-primary); }
+.pattern .why { margin: 0; font-size: 11px; color: var(--text-muted); }
+.pattern .actions { display: flex; gap: var(--space-2); }
+.pattern .note, .policy .note { margin: var(--space-1) 0 0; }
+.settings-page .add { display: flex; gap: var(--space-2); margin: var(--space-2) 0 0; }
+.settings-page .add input {
+    flex: 1;
+    max-width: 22em;
+    height: var(--control-sm);
+    box-sizing: border-box;
+    padding: 0 var(--space-2);
+    font: inherit;
+    font-size: 12px;
+    color: inherit;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+}
 
 /* Narrow: the details pane goes, and the metrics stack over the charts. */
 @media (max-width: 700px) {

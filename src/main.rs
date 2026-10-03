@@ -16,7 +16,10 @@ use libgxwi::App;
 mod chart;
 mod dashboards;
 mod metrics;
+mod policy;
 mod query;
+mod settings;
+mod settings_tab;
 mod viewer;
 mod words;
 
@@ -29,12 +32,13 @@ libgxwi::icon!(b"dev.peios.gxwi-event-viewer");
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let (kind, origin, metrics) = match arguments.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
-        [] | ["--events"] => (Kind::Events, None, false),
-        ["--logs", origin] => (Kind::Logs, Some(origin.to_string()), false),
-        ["--metrics"] => (Kind::Events, None, true),
+    let (kind, origin, opens) = match arguments.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        [] | ["--events"] => (Kind::Events, None, ""),
+        ["--logs", origin] => (Kind::Logs, Some(origin.to_string()), ""),
+        ["--metrics"] => (Kind::Events, None, "metrics"),
+        ["--settings"] => (Kind::Events, None, "settings"),
         _ => {
-            eprintln!("gxwi-event-viewer: usage: gxwi-event-viewer [--events | --metrics | --logs ORIGIN]");
+            eprintln!("gxwi-event-viewer: usage: gxwi-event-viewer [--events | --metrics | --settings | --logs ORIGIN]");
             std::process::exit(64);
         }
     };
@@ -53,10 +57,10 @@ fn main() {
     let aside = Arc::downgrade(&window);
     window.update(|viewer, fields| {
         viewer.window = aside;
-        if metrics {
-            viewer.fill_metrics(fields);
-        } else {
-            viewer.fill(fields, origin.as_deref());
+        match opens {
+            "metrics" => viewer.fill_metrics(fields),
+            "settings" => viewer.fill_settings(fields),
+            _ => viewer.fill(fields, origin.as_deref()),
         }
     });
     if let Err(e) = app.run() {

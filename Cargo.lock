@@ -326,9 +326,21 @@ name = "gxwi-event-viewer"
 version = "0.0.1"
 dependencies = [
  "eventd-client",
+ "gxwi-sd-editor",
  "jiff",
  "libgxwi",
  "peios",
+ "serde_json",
+]
+
+[[package]]
+name = "gxwi-sd-editor"
+version = "0.0.1"
+dependencies = [
+ "base64",
+ "libauthd",
+ "peios",
+ "serde",
  "serde_json",
 ]
 
@@ -516,6 +528,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "875a5a69ac2bab1a891711cf5eccbec1ce0341ea805560dcd90b7a2e925132e8"
 dependencies = [
  "jiff-tzdb",
+]
+
+[[package]]
+name = "libauthd"
+version = "0.0.22"
+source = "git+https://github.com/peios/authd.git?rev=3aec2905a4e0bcbe7a4fd07682fb328847d6fc18#3aec2905a4e0bcbe7a4fd07682fb328847d6fc18"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
