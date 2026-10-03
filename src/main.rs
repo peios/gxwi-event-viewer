@@ -1,8 +1,8 @@
-//! Event Viewer: what eventd has recorded on this machine, the logs of its
-//! services and the events of its kernel and programs, newest first and
-//! live. With `--logs ORIGIN` it opens on what one service, or whatever
-//! else logs as ORIGIN, has written, which is what Services Manager's Logs
-//! button asks for; with `--events`, on the events.
+//! Event Viewer: what eventd has recorded on this machine, the events of
+//! its kernel and programs and the logs of its services, newest first and
+//! live. It opens on the events. With `--logs ORIGIN` it opens instead on
+//! what one service, or whatever else logs as ORIGIN, has written, which is
+//! what Services Manager's Logs button asks for.
 //!
 //! It asks eventd, on its query socket, as whoever is looking: what it
 //! shows is what eventd lets them read, and it says what eventd keeps from
@@ -26,11 +26,10 @@ libgxwi::icon!(b"dev.peios.gxwi-event-viewer");
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let (kind, origin) = match arguments.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
-        [] => (Kind::Logs, None),
+        [] | ["--events"] => (Kind::Events, None),
         ["--logs", origin] => (Kind::Logs, Some(origin.to_string())),
-        ["--events"] => (Kind::Events, None),
         _ => {
-            eprintln!("gxwi-event-viewer: usage: gxwi-event-viewer [--logs ORIGIN | --events]");
+            eprintln!("gxwi-event-viewer: usage: gxwi-event-viewer [--events | --logs ORIGIN]");
             std::process::exit(64);
         }
     };

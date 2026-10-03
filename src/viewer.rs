@@ -408,7 +408,7 @@ impl Viewer {
             Following::Back | Following::Stopped(_) => "<button type=\"button\" class=\"live\" fx-click=\"resume\" title=\"Show the newest again, and follow what is recorded\">Newest</button>".to_string(),
         };
         format!(
-            "<div class=\"bar\"><div class=\"top\"><span class=\"tabs\" role=\"group\" aria-label=\"Show\">{logs}{events}</span>\
+            "<div class=\"bar\"><div class=\"top\"><span class=\"tabs\" role=\"group\" aria-label=\"Show\">{events}{logs}</span>\
              {live}<button type=\"button\" class=\"refresh\" fx-click=\"refresh\" fx-key=\"F5\" title=\"Read again from the newest (F5)\">Refresh</button></div>\
              <form class=\"filters\" fx-submit=\"apply\">{filters}{range}<button type=\"submit\">Apply</button></form>\
              <datalist id=\"suggestions\">{suggestions}</datalist></div>",
@@ -441,11 +441,10 @@ impl Viewer {
                     Kind::Events => (
                         "",
                         format!(
-                            "<span class=\"when\">{}</span><span class=\"type\">{}</span><span class=\"source\">{}</span><span class=\"summary\">{}</span>",
+                            "<span class=\"when\">{}</span><span class=\"type\">{}</span><span class=\"source\">{}</span>",
                             escape(&when(row)),
                             escape(&text(record, "event_type")),
                             escape(&record.get("origin_class").map(words::source).unwrap_or_default()),
-                            escape(&words::summary(record)),
                         ),
                     ),
                 };
@@ -458,7 +457,7 @@ impl Viewer {
             .collect();
         let (columns, head) = match self.kind {
             Kind::Logs => ("150px minmax(0, 160px) minmax(0, 1fr)", "<span>Time</span><span>From</span><span>Message</span>"),
-            Kind::Events => ("150px minmax(0, 220px) 120px minmax(0, 1fr)", "<span>Time</span><span>Type</span><span>Source</span><span>Details</span>"),
+            Kind::Events => ("150px minmax(0, 1fr) 140px", "<span>Time</span><span>Type</span><span>Source</span>"),
         };
         let noun = self.noun();
         let empty = if !self.rows.is_empty() {
@@ -622,7 +621,7 @@ impl Live for Viewer {
             "<div hidden>\
              <button type=\"button\" fx-key=\"ArrowDown\" fx-click=\"pick\" fx-value-row=\"{next}\"></button>\
              <button type=\"button\" fx-key=\"ArrowUp\" fx-click=\"pick\" fx-value-row=\"{previous}\"></button>\
-             </div>{bar}<div class=\"body\">{listing}{details}</div>{footer}\
+             </div>{bar}<div class=\"split\" id=\"split\" fx-columns=\"minmax(0, 1fr) 340px\"><div class=\"body\">{listing}{details}</div></div>{footer}\
              <menu id=\"row-menu\" hidden><li><button type=\"button\" fx-click=\"only\">{only}</button></li></menu>",
             next = self.near(1),
             previous = self.near(-1),
@@ -885,6 +884,8 @@ mod tests {
         assert!(html.contains("<dt>Source<code>origin_class</code></dt><dd>Programs</dd>"));
         assert!(html.contains("<dt>Time<code>timestamp</code></dt><dd>Saturday 3 October 2026, 08:58:16.126088777 (+00:00)</dd>"));
         assert!(html.contains("<h3>Its fields</h3><dl><dt>service</dt><dd>timed</dd><dt>user_sid</dt><dd>S-1-5-18</dd></dl>"));
-        assert!(html.contains("<span class=\"summary\">service=timed  user_sid=S-1-5-18</span>"));
+        assert!(html.contains("<span class=\"type\">graph.operation_terminal</span><span class=\"source\">Programs</span></button>"));
+        // Events come first.
+        assert!(html.find("fx-value-kind=\"events\"") < html.find("fx-value-kind=\"logs\""));
     }
 }

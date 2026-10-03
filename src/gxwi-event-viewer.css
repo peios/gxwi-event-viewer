@@ -64,9 +64,13 @@ body {
 .bar .live.on::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: var(--space-1); border-radius: 50%; background: var(--accent-solid); vertical-align: 1px; }
 .bar input:focus-visible, .bar select:focus-visible, .bar button:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
 
-/* The records and, beside them, the one picked in full. */
-.body { display: flex; flex: 1; min-height: 0; }
-.listing { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+/* The records and, beside them, the one picked in full: two columns of
+   one grid, so that the edge between them is dragged as a column's is.
+   It is grabbed from the details' side, since the listing is a grid of
+   its own. */
+.split { display: flex; flex: 1; min-height: 0; }
+.body { display: grid; grid-template-columns: var(--fx-columns); flex: 1; min-width: 0; min-height: 0; }
+.listing { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .listing .scroll { flex: 1; min-height: 0; overflow-y: auto; }
 
 /* One grid for the head and every row, so the columns line up. The widths
@@ -108,7 +112,6 @@ body {
 .entries .row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .entries .row .when { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 .entries .row .message, .entries .row .type { color: var(--text-primary); }
-.entries .row .summary { color: var(--text-muted); }
 .entries .row:hover { background: var(--surface-2); }
 .entries .row[aria-selected="true"] { background: var(--surface-2); border-color: var(--accent-solid); }
 /* From standard error. */
@@ -117,8 +120,7 @@ body {
 .entries .row.error:hover { background: color-mix(in srgb, var(--danger-text) 15%, transparent); }
 
 .details {
-    flex: none;
-    width: 340px;
+    min-width: 0;
     padding: var(--space-4) var(--space-3);
     overflow-y: auto;
     border-left: 1px solid var(--border-default);
@@ -190,6 +192,8 @@ body {
 .older:hover { border-color: var(--border-strong); }
 .older:focus-visible, .link:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
 
-/* Narrow: the details pane goes, then the events' source. */
-@media (max-width: 900px) { .details { width: 260px; } }
-@media (max-width: 700px) { .details { display: none; } }
+/* Narrow: the details pane goes. */
+@media (max-width: 700px) {
+    .body { grid-template-columns: minmax(0, 1fr); }
+    .details { display: none; }
+}

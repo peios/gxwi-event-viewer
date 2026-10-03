@@ -130,17 +130,6 @@ fn sid(bytes: &[u8]) -> Option<String> {
     Some(format!("S-1-{authority}{tail}"))
 }
 
-/// What an event is about, in a line: its own fields, those that are not
-/// the header's, by name.
-pub fn summary(record: &Record) -> String {
-    record
-        .iter()
-        .filter(|(field, _)| !HEADERS.contains(&field.as_str()))
-        .map(|(field, item)| format!("{field}={}", value(item)))
-        .collect::<Vec<_>>()
-        .join("  ")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,16 +165,9 @@ mod tests {
     }
 
     #[test]
-    fn an_event_is_summed_up_by_its_own_fields() {
-        let record: Record = [
-            ("timestamp".to_string(), Value::Signed(1)),
-            ("event_type".to_string(), Value::String("graph.operation_terminal".into())),
-            ("service".to_string(), Value::String("timed".into())),
-            ("outcome".to_string(), Value::String("failed".into())),
-        ]
-        .into_iter()
-        .collect();
-        assert_eq!(summary(&record), "outcome=failed  service=timed");
+    fn a_records_time_is_its_timestamp() {
+        let record: Record = [("timestamp".to_string(), Value::Signed(1))].into_iter().collect();
         assert_eq!(timestamp(&record), Some(1));
+        assert_eq!(timestamp(&Record::new()), None);
     }
 }
