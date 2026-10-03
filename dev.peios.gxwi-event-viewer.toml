@@ -1,0 +1,7 @@
+# What Event Viewer is to a desktop (PGSS Applications): installed as
+# /usr/share/apps/dev.peios.gxwi-event-viewer.toml, named for the id, by the
+# package that installs the program. It is a window and nothing else: what a
+# terminal does with logs and events is evctl's.
+title = "Event Viewer"
+description = "Read this machine's logs and events, as they happen"
+program = "/usr/bin/gxwi-event-viewer"

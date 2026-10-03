@@ -1,0 +1,195 @@
+/* Made from the theme's tokens, which the desktop's page for a live surface
+   brings with it. */
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    font: 500 13px/1.4 var(--font-text);
+    color-scheme: light dark;
+    overflow: hidden;
+}
+
+#fx-root { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+#fx-root[data-connected="false"] { opacity: 0.5; }
+
+/* The bar: logs or events and following, and under them what to show. */
+.bar {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-2);
+}
+.bar .top { display: flex; align-items: center; gap: var(--space-2); }
+.bar .tabs { display: flex; flex: none; margin-right: auto; }
+.bar .tab { border-radius: 0; }
+.bar .tab:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.bar .tab:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-left: -1px; }
+.bar .tab[aria-pressed="true"] { color: var(--accent-on); background: var(--accent-solid); border-color: var(--accent-solid); }
+
+.bar .filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; margin: 0; }
+
+.bar input:not([type="checkbox"]), .bar select {
+    flex: 1;
+    min-width: 8em;
+    max-width: 18em;
+    height: var(--control-sm);
+    box-sizing: border-box;
+    padding: 0 var(--space-2);
+    font: inherit;
+    color: inherit;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+}
+.bar select { flex: none; min-width: 0; }
+.bar .check { display: flex; flex: none; align-items: center; gap: var(--space-1); white-space: nowrap; }
+
+.bar button {
+    flex: none;
+    height: var(--control-sm);
+    padding: 0 var(--space-3);
+    font: inherit;
+    color: var(--text-primary);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+.bar button:hover:not(:disabled) { border-color: var(--border-strong); }
+.bar .live.on::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: var(--space-1); border-radius: 50%; background: var(--accent-solid); vertical-align: 1px; }
+.bar input:focus-visible, .bar select:focus-visible, .bar button:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
+
+/* The records and, beside them, the one picked in full. */
+.body { display: flex; flex: 1; min-height: 0; }
+.listing { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.listing .scroll { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* One grid for the head and every row, so the columns line up. The widths
+   are the page's, from fx-columns on the listing. */
+.head, .entries .row {
+    display: grid;
+    grid-template-columns: var(--fx-columns);
+    gap: var(--space-2);
+    align-items: center;
+    padding: 2px var(--space-3);
+}
+
+.head {
+    flex: none;
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+    border-bottom: 1px solid var(--border-default);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.entries { margin: 0; padding: var(--space-1) 0; list-style: none; }
+
+.entries .row {
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: default;
+    user-select: none;
+}
+.entries .row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.entries .row .when { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.entries .row .message, .entries .row .type { color: var(--text-primary); }
+.entries .row .summary { color: var(--text-muted); }
+.entries .row:hover { background: var(--surface-2); }
+.entries .row[aria-selected="true"] { background: var(--surface-2); border-color: var(--accent-solid); }
+/* From standard error. */
+.entries .row.error { background: color-mix(in srgb, var(--danger-text) 9%, transparent); }
+.entries .row.error .message { color: var(--danger-text); }
+.entries .row.error:hover { background: color-mix(in srgb, var(--danger-text) 15%, transparent); }
+
+.details {
+    flex: none;
+    width: 340px;
+    padding: var(--space-4) var(--space-3);
+    overflow-y: auto;
+    border-left: 1px solid var(--border-default);
+}
+.details.empty p { color: var(--text-muted); }
+.details h2 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.details h3 { margin: var(--space-4) 0 0; font-size: 12px; font-weight: 600; }
+.details .message {
+    margin: var(--space-3) 0 0;
+    padding: var(--space-2);
+    font: 500 12px/1.5 var(--font-mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: var(--bg-sunken);
+    border-radius: var(--radius-sm);
+}
+.details .message.error { color: var(--danger-text); }
+.details dl { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0 0; font-size: 12px; }
+.details dt { color: var(--text-muted); }
+.details dt code { display: block; font: 500 10px/1.3 var(--font-mono); }
+.details dd { margin: 0; overflow-wrap: anywhere; }
+.details .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border-default); }
+.details .actions button {
+    height: var(--control-sm);
+    max-width: 100%;
+    padding: 0 var(--space-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-primary);
+    background: var(--surface-2);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+.details .actions button:hover { border-color: var(--border-strong); }
+.details .actions button:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
+
+.status {
+    display: flex;
+    flex: none;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-1) var(--space-3);
+    border-top: 1px solid var(--border-default);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.status .hidden { text-align: right; }
+
+.trouble, .more, .note { margin: var(--space-2) var(--space-3); font-size: 12px; color: var(--text-muted); }
+.trouble, .note.bad { color: var(--danger-text); }
+.note { padding: var(--space-2) var(--space-3); background: var(--surface-2); border-radius: var(--radius-sm); color: var(--text-secondary); }
+.more { text-align: center; }
+
+.link { padding: 0; font: inherit; color: var(--accent-text, var(--accent-solid)); background: none; border: none; cursor: pointer; text-decoration: underline; }
+.older {
+    height: var(--control-sm);
+    padding: 0 var(--space-4);
+    font: inherit;
+    color: var(--text-primary);
+    background: var(--surface-2);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+.older:hover { border-color: var(--border-strong); }
+.older:focus-visible, .link:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
+
+/* Narrow: the details pane goes, then the events' source. */
+@media (max-width: 900px) { .details { width: 260px; } }
+@media (max-width: 700px) { .details { display: none; } }

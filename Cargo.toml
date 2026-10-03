@@ -1,0 +1,20 @@
+[package]
+name = "gxwi-event-viewer"
+version = "0.0.1"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+# Beside this checkout until a libgxwi with the dialog role is released.
+libgxwi = { path = "../gxwi/libgxwi" }
+# eventd's query channel, live tails, query text and read access. Beside
+# this checkout until it is pushed. It pins the same `peios` revision as
+# libgxwi, which it must: `peios-sys` links libpeios, and a program can hold
+# only one of it.
+eventd-client = { path = "../eventd/eventd-client" }
+# A record's time, said on this machine's clock.
+jiff = "0.2.29"
+
+[dev-dependencies]
+serde_json = "1"
