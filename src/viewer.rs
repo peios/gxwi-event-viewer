@@ -239,7 +239,7 @@ impl Viewer {
         if self.paging || self.complete {
             return;
         }
-        let Some(oldest) = self.rows.back().and_then(|row| words::timestamp(&row.record)) else { return };
+        let Some((anchor, oldest)) = self.rows.back().and_then(|row| Some((row.id, words::timestamp(&row.record)?))) else { return };
         let shown = self.rows.iter().rev().take_while(|row| words::timestamp(&row.record) == Some(oldest)).count();
         let Some(window) = self.window.upgrade() else { return };
         self.paging = true;
@@ -248,16 +248,21 @@ impl Viewer {
         let epoch = self.epoch.load(Ordering::SeqCst);
         std::thread::spawn(move || {
             let page = eventd_client::query(&socket, &text);
-            window.update(|viewer, _| viewer.paged(epoch, page));
+            window.update(|viewer, _| viewer.paged(epoch, anchor, page));
         });
     }
 
-    /// An older page, or why there is none.
-    fn paged(&mut self, epoch: u64, page: Result<Vec<Record>, Error>) {
+    /// An older page, or why there is none. It follows the row `anchor`,
+    /// the oldest when it was asked for; if that has been let go since, to
+    /// make room for new ones, the page would leave a gap, and is dropped.
+    fn paged(&mut self, epoch: u64, anchor: u64, page: Result<Vec<Record>, Error>) {
         if self.epoch.load(Ordering::SeqCst) != epoch {
             return;
         }
         self.paging = false;
+        if self.rows.back().map(|row| row.id) != Some(anchor) {
+            return;
+        }
         let records = match page {
             Ok(records) => records,
             Err(error) => {
@@ -797,10 +802,28 @@ mod tests {
         assert_eq!(viewer.rows.len(), HELD);
         assert!(viewer.rows.iter().all(|row| words::value(&row.record["message"]) == "new"));
         // Paged back past what is held, the newest go and it stops following.
-        viewer.paged(0, Ok((0..PAGE as i64).rev().map(|at| log(at, "a", "old", false)).collect()));
+        let anchor = viewer.rows.back().unwrap().id;
+        viewer.paged(0, anchor, Ok((0..PAGE as i64).rev().map(|at| log(at, "a", "old", false)).collect()));
         assert_eq!(viewer.rows.len(), HELD);
         assert_eq!(viewer.following, Following::Back);
         assert!(shown(&viewer).contains("Showing older logs. Newer ones were let go to make room."));
+    }
+
+    #[test]
+    fn a_page_asked_for_before_its_rows_were_let_go_is_dropped() {
+        let mut viewer = viewer(Kind::Logs);
+        viewer.initial(0, (0..PAGE as i64).rev().map(|at| log(1000 + at, "a", "x", false)).collect());
+        let anchor = viewer.rows.back().unwrap().id;
+        // While the page is on its way, enough new ones come that the row
+        // it was asked from goes.
+        viewer.live(0, (0..HELD as i64).map(|at| log(5000 + at, "a", "new", false)).collect());
+        let oldest = viewer.rows.back().unwrap().id;
+        viewer.paged(0, anchor, Ok((0..PAGE as i64).rev().map(|at| log(at, "a", "old", false)).collect()));
+        assert_eq!(viewer.rows.len(), HELD);
+        assert_eq!(viewer.rows.back().unwrap().id, oldest);
+        assert_eq!(viewer.following, Following::Yes);
+        assert!(!viewer.paging);
+        assert!(shown(&viewer).contains("Show older</button>"));
     }
 
     #[test]
