@@ -15,7 +15,7 @@ libgxwi = { path = "../gxwi/libgxwi" }
 eventd-client = { path = "../eventd/eventd-client" }
 # The person's registry, where their dashboards are kept. The revision
 # eventd-client pins.
-peios = { git = "https://github.com/peios/peios-rs.git", rev = "3cf23f68d40c4adff252e28241bb3c958fba824f", package = "peios" }
+peios = { git = "https://github.com/peios/peios-rs.git", rev = "2a2a6bb022192f6e98d4e4a6a7efdbdd40d53b35", package = "peios" }
 # eventd's read policy, opened in the permissions editor, and who a SID is,
 # said as the editor says it.
 gxwi-sd-editor = { path = "../gxwi-sd-editor", default-features = false, features = ["names", "splice"] }
