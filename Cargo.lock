@@ -340,6 +340,7 @@ version = "0.0.1"
 dependencies = [
  "base64",
  "libauthd",
+ "libauthd-client",
  "peios",
  "serde",
  "serde_json",
@@ -534,9 +535,17 @@ dependencies = [
 [[package]]
 name = "libauthd"
 version = "0.0.22"
-source = "git+https://github.com/peios/authd.git?rev=ecd0cdd8fb1b0c82376750ab1a248dc82534a03e#ecd0cdd8fb1b0c82376750ab1a248dc82534a03e"
+source = "git+https://github.com/peios/authd.git?rev=bef250488952820015683f3020d15c7f4adbe0d4#bef250488952820015683f3020d15c7f4adbe0d4"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "libauthd-client"
+version = "0.0.22"
+source = "git+https://github.com/peios/authd.git?rev=bef250488952820015683f3020d15c7f4adbe0d4#bef250488952820015683f3020d15c7f4adbe0d4"
+dependencies = [
+ "libauthd",
 ]
 
 [[package]]
