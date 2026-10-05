@@ -21,12 +21,26 @@ use eventd_client::access::{
 };
 use eventd_client::text;
 use gxwi_sd_editor::names::Names;
-use gxwi_sd_editor::{Can, Children, Generic, Object, Part, Request, Right, splice};
+use gxwi_sd_editor::{Can, Children, Generic, Naming, Object, ObjectPart, Part, PartKind, Request, Right, splice};
 use peios::registry::{CreateFlags, Key, KeyAccess, OpenFlags, ValueType};
 use peios::security::{AceType, SecurityDescriptor};
 
 const EACCES: i32 = 13;
 const ENOENT: i32 = 2;
+
+/// The namespace eventd's field GUIDs are UUID v5 in (eventd TRM §B), for
+/// the editor to derive a field's GUID from a name the person types.
+const FIELD_NAMESPACE: &str = "e7d3a1b0-5c2f-4e8a-9b1d-0a6f3c8e2d4b";
+
+/// A GUID as it is written, from its wire bytes, whose first three groups
+/// are little-endian.
+fn guid_text(g: &[u8; 16]) -> String {
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{}",
+        g[3], g[2], g[1], g[0], g[5], g[4], g[7], g[6], g[8], g[9],
+        g[10..].iter().map(|b| format!("{b:02x}")).collect::<String>()
+    )
+}
 
 /// The generic rights as an access mask carries them, before mapping.
 const ALL: u32 = 0x1000_0000;
@@ -285,8 +299,27 @@ pub fn edit(space: Space, pattern: &str, changed: impl Fn() + Send + 'static) ->
         Err(error) => return Err(unreadable(&error)),
     };
     let current = load(&path)?.ok_or("it has gone")?;
+    // Reading can be granted a field at a time (eventd TRM §7.3): the
+    // fields every record has, and, for events and metrics, any other by
+    // its name, whose GUID eventd derives from it.
+    let field = |name: &str| ObjectPart { guid: guid_text(&access::field_guid(name)), name: name.into(), kind: PartKind::Property, set: None };
+    let (fields, naming): (Vec<&str>, _) = match space {
+        Space::Events => (crate::words::HEADERS.to_vec(), Some(("field", "source.name"))),
+        Space::Logs => (vec!["timestamp", "origin", "is_error", "message", "job_id", "boot_id"], None),
+        Space::Metrics => (vec!["timestamp", "boot_id", "name", "type", "value"], Some(("label", "core"))),
+        Space::Admin => (vec![], None),
+    };
     let request = Request {
-        object: Object { name: space.covers(pattern), kind: format!("eventd's {} policy", space.heading().to_lowercase()), container: false, children: Children::All, ..Object::default() },
+        object: Object {
+            name: space.covers(pattern),
+            kind: format!("eventd's {} policy", space.heading().to_lowercase()),
+            container: false,
+            children: Children::All,
+            parts: fields.iter().map(|f| field(f)).collect(),
+            part_rights: if fields.is_empty() { vec![] } else { vec![Right { name: "Read".into(), mask: EVENTD_READ, general: false }] },
+            naming: naming.map(|(noun, example)| Naming { namespace: FIELD_NAMESPACE.into(), noun: noun.into(), example: Some(example.into()) }),
+            ..Object::default()
+        },
         sd: current.as_bytes().to_vec(),
         rights: space.rights(),
         generic: Generic { read: GENERIC_READ, write: GENERIC_WRITE, execute: GENERIC_EXECUTE, all: GENERIC_ALL },
@@ -354,6 +387,14 @@ mod tests {
 
     fn said(text: &str, space: Space) -> Vec<(String, String)> {
         grants(&sddl::parse(text).unwrap(), space, &mut Names::offline())
+    }
+
+    #[test]
+    fn a_field_is_sent_by_the_guid_eventd_gives_it() {
+        // The editor derives a typed field's GUID from FIELD_NAMESPACE; its
+        // own test gives "timestamp" this one, which eventd agrees with.
+        assert_eq!(guid_text(&access::field_guid("timestamp")), "341d2267-b9db-536b-b36c-94ab6cd47e4c");
+        assert_eq!(FIELD_NAMESPACE.len(), 36);
     }
 
     #[test]
