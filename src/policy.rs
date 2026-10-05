@@ -253,7 +253,9 @@ fn grants(descriptor: &SecurityDescriptor, space: Space, names: &mut Names) -> V
         let field = || {
             ace.object_type().map_or_else(
                 || "a field".to_string(),
-                |guid| fields.get(guid).cloned().unwrap_or_else(|| "a field of its own".into()),
+                // Its name can't be told from its GUID: what else it is
+                // is a field the records' emitters chose, or a label.
+                |guid| fields.get(guid).cloned().unwrap_or_else(|| if space == Space::Metrics { "a label" } else { "a payload field" }.into()),
             )
         };
         let what = match ace.ace_type() {
@@ -277,7 +279,8 @@ fn grants(descriptor: &SecurityDescriptor, space: Space, names: &mut Names) -> V
 }
 
 /// The fields eventd always has, by their GUIDs, so that a grant of one
-/// can be said by name; a payload field's is said as "a field of its own".
+/// can be said by name; a payload field's is said as "a payload field", and
+/// a metric label's as "a label".
 fn known_fields() -> BTreeMap<[u8; 16], String> {
     crate::words::HEADERS
         .iter()
@@ -426,7 +429,7 @@ mod tests {
             [
                 ("Anonymous".to_string(), "may not read".to_string()),
                 ("Local System".into(), "may read".into()),
-                ("BUILTIN\\Administrators".into(), "may read its timestamp field; may read its message field; may read a field of its own".into())
+                ("BUILTIN\\Administrators".into(), "may read its timestamp field; may read its message field; may read a payload field".into())
             ]
         );
     }
