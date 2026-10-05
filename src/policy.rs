@@ -286,11 +286,12 @@ pub fn edit(space: Space, pattern: &str, changed: impl Fn() + Send + 'static) ->
     };
     let current = load(&path)?.ok_or("it has gone")?;
     let request = Request {
-        object: Object { name: space.covers(pattern), kind: format!("eventd's {} policy", space.heading().to_lowercase()), container: false, children: Children::All },
+        object: Object { name: space.covers(pattern), kind: format!("eventd's {} policy", space.heading().to_lowercase()), container: false, children: Children::All, ..Object::default() },
         sd: current.as_bytes().to_vec(),
         rights: space.rights(),
         generic: Generic { read: GENERIC_READ, write: GENERIC_WRITE, execute: GENERIC_EXECUTE, all: GENERIC_ALL },
         can,
+        ..Request::default()
     };
     let apply = move |sd: &[u8], parts: &[Part]| {
         let now = load(&path)?.ok_or("it has gone")?;
