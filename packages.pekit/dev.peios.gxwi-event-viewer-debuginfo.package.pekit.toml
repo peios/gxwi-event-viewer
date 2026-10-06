@@ -1,0 +1,12 @@
+[package]
+name = "dev.peios.gxwi-event-viewer-debuginfo"
+description = "GXWI event viewer-debuginfo"
+license = "((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR BSD-2-Clause OR MIT) AND (Apache-2.0 OR BSL-1.0) AND (Apache-2.0 OR MIT) AND BSD-3-Clause AND ISC AND MIT AND (MIT AND BSD-3-Clause) AND (MIT OR Unlicense)"
+
+[dependencies]
+"dev.peios.gxwi-event-viewer" = "= {{release}}"
+
+[files]
+"@source:LICENSE" = "usr/share/licenses/dev.peios.gxwi-event-viewer-debuginfo/LICENSE"
+":licenses/**" = "usr/share/licenses/dev.peios.gxwi-event-viewer-debuginfo/third-party"
+":debug/gxwi-event-viewer/usr/lib/debug/**" = "usr/lib/debug"

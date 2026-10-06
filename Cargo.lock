@@ -231,7 +231,8 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "eventd-client"
-version = "0.1.9"
+version = "0.1.11"
+source = "git+https://github.com/peios/eventd.git?rev=3df88bab845d962e866158896807eac2976b83e3#3df88bab845d962e866158896807eac2976b83e3"
 dependencies = [
  "libc",
  "peios",
@@ -337,6 +338,7 @@ dependencies = [
 [[package]]
 name = "gxwi-sd-editor"
 version = "0.0.1"
+source = "git+https://github.com/peios/gxwi-sd-editor.git?rev=27239eb3411ab82d711262bfd59e537c66c29e9e#27239eb3411ab82d711262bfd59e537c66c29e9e"
 dependencies = [
  "base64",
  "libauthd",
@@ -534,16 +536,16 @@ dependencies = [
 
 [[package]]
 name = "libauthd"
-version = "0.0.22"
-source = "git+https://github.com/peios/authd.git?rev=4c2b7bddb0794731a22e1bad8ffe2f0affaf5d79#4c2b7bddb0794731a22e1bad8ffe2f0affaf5d79"
+version = "0.0.23"
+source = "git+https://github.com/peios/authd.git?rev=90471e3d4db127528862fb325b04edb3d4f0fc30#90471e3d4db127528862fb325b04edb3d4f0fc30"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "libauthd-client"
-version = "0.0.22"
-source = "git+https://github.com/peios/authd.git?rev=4c2b7bddb0794731a22e1bad8ffe2f0affaf5d79#4c2b7bddb0794731a22e1bad8ffe2f0affaf5d79"
+version = "0.0.23"
+source = "git+https://github.com/peios/authd.git?rev=90471e3d4db127528862fb325b04edb3d4f0fc30#90471e3d4db127528862fb325b04edb3d4f0fc30"
 dependencies = [
  "libauthd",
 ]
@@ -556,7 +558,8 @@ checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
 name = "libgxwi"
-version = "0.0.2"
+version = "0.0.3"
+source = "git+https://github.com/peios/gxwi.git?rev=5629140add3de075511b3379fd690fdabd06dcaf#5629140add3de075511b3379fd690fdabd06dcaf"
 dependencies = [
  "axum",
  "hyper",
@@ -581,7 +584,8 @@ dependencies = [
 
 [[package]]
 name = "libregman"
-version = "0.8.16"
+version = "0.8.17"
+source = "git+https://github.com/peios/peiosutils.git?rev=67ffede760dc1c5767fbb3c6c66e5fc5e12b7314#67ffede760dc1c5767fbb3c6c66e5fc5e12b7314"
 dependencies = [
  "memchr",
  "memmap2",
@@ -657,7 +661,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 [[package]]
 name = "peios"
 version = "0.4.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=02c87cb643c30eef6b74cd1d9d8b0ae067bed69a#02c87cb643c30eef6b74cd1d9d8b0ae067bed69a"
+source = "git+https://github.com/peios/peios-rs.git?rev=f8c84930f2b71763bcf0550df0b1420a0f63b21e#f8c84930f2b71763bcf0550df0b1420a0f63b21e"
 dependencies = [
  "bitflags 2.13.2",
  "libc",
@@ -667,7 +671,7 @@ dependencies = [
 [[package]]
 name = "peios-sys"
 version = "0.3.0"
-source = "git+https://github.com/peios/peios-rs.git?rev=02c87cb643c30eef6b74cd1d9d8b0ae067bed69a#02c87cb643c30eef6b74cd1d9d8b0ae067bed69a"
+source = "git+https://github.com/peios/peios-rs.git?rev=f8c84930f2b71763bcf0550df0b1420a0f63b21e#f8c84930f2b71763bcf0550df0b1420a0f63b21e"
 dependencies = [
  "bindgen",
  "pkg-config",

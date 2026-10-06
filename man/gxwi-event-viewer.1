@@ -1,0 +1,73 @@
+.TH GXWI-EVENT-VIEWER 1 "2026-10-06" "Peios"
+.SH NAME
+gxwi-event-viewer \- read this machine's events, metrics and logs, as they happen, on a GXWI desktop
+.SH SYNOPSIS
+.B gxwi-event-viewer
+.RB [ \-\-events " | " \-\-metrics " | " \-\-settings ]
+.br
+.B gxwi-event-viewer \-\-logs
+.I ORIGIN
+.SH DESCRIPTION
+Event Viewer shows what eventd has recorded on this machine: the events of
+its kernel and programs, the metrics programs publish, and the logs of its
+services. It has four tabs: Events, Metrics, Logs and Settings. Events and
+logs are listed newest first, and new ones are added at the top as they are
+recorded; Pause keeps the list still, and Resume carries on. The list starts
+with the newest 200; Show older adds the 200 before them, and a window holds
+at most 1,000. Events narrow by type and source, logs by where they came
+from, by text, and to errors only. Picking a row shows all of it beside the
+list.
+.PP
+Metrics lists every metric the person may read, and charts them on
+dashboards they arrange. A person's dashboards are their own, kept in the
+registry at CurrentUser\eSoftware\egxwi-event-viewer; until they make one,
+they are shown eventd's health.
+.PP
+It asks eventd, on its query socket, as the person looking, so it shows
+exactly what they may read. eventd leaves out what they may not read
+without saying so; Event Viewer reads eventd's read policy as them and says
+what is kept from them, rather than showing an empty list as if there were
+nothing.
+.PP
+Settings shows every value under Machine\eSystem\eeventd, described as
+eventd's own regman page describes it, and who may read what. Anyone may
+look. Only those allowed to change eventd's settings may change them, as
+shipped Administrators; everyone else sees them read-only, with a line
+saying why. Each pattern of the read policy opens in the permissions editor
+to be changed; a pattern may be added, and removed after asking, but the *
+patterns cannot be removed.
+.PP
+Without a desktop to open on, it says so and ends: on a terminal, evctl does
+what this does.
+.SH OPTIONS
+.TP
+.B \-\-events
+Open on the events. This is what it does with no option.
+.TP
+.B \-\-metrics
+Open on the person's dashboards of metrics.
+.TP
+.B \-\-settings
+Open on eventd's settings and read policy.
+.TP
+.BI \-\-logs " ORIGIN"
+Open on what
+.I ORIGIN
+has logged: a service, with its hooks and health checks, or whatever else
+logs under that name. Services Manager's Logs... opens it so.
+.SH FILES
+.TP
+.I /usr/share/apps/dev.peios.gxwi-event-viewer.toml
+Its application declaration, listed in a launcher as Event Viewer.
+.TP
+.I /run/eventd/query.sock
+eventd's query socket, which it asks.
+.TP
+.I /usr/share/regman/eventd.regman
+eventd's regman page, from which the Settings tab takes what each value
+means, its default and its range.
+.SH SEE ALSO
+.BR evctl (1),
+.BR gxwi-sd-editor (1).
+.PP
+Event Viewer, at learn.peios.org.
