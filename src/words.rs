@@ -25,23 +25,38 @@ impl Clock {
     }
 }
 
-/// An event's header fields (§3.22), in the order the details give them.
-/// Every other field is the event's own.
-pub const HEADERS: [&str; 9] =
-    ["timestamp", "event_type", "origin_class", "process_guid", "effective_token_guid", "true_token_guid", "boot_id", "cpu_id", "sequence"];
+/// An event's header fields (§3.22), by the PGSS §6.4 paths eventd names
+/// them by, in the order the details give them. Every other field is the
+/// event's own. Logs and metrics keep their own names (`timestamp`).
+pub const HEADERS: [&str; 9] = [
+    EVENT_TIME,
+    EVENT_TYPE,
+    EMITTER_CLASS,
+    "emitter.process.guid",
+    "emitter.token.guid",
+    "emitter.true-token.guid",
+    "event.boot.guid",
+    "event.cpu",
+    "event.sequence",
+];
+
+/// When an event was recorded, what it is, and what emitted it.
+pub const EVENT_TIME: &str = "event.time";
+pub const EVENT_TYPE: &str = "event.type";
+pub const EMITTER_CLASS: &str = "emitter.class";
 
 /// What a header field, or a log field, is called in the details.
 pub fn field_name(field: &str) -> Option<&'static str> {
     Some(match field {
-        "timestamp" => "Time",
-        "event_type" => "Type",
-        "origin_class" => "Source",
-        "process_guid" => "Process",
-        "effective_token_guid" => "Token",
-        "true_token_guid" => "Real token",
-        "boot_id" => "Boot",
-        "cpu_id" => "Processor",
-        "sequence" => "Sequence",
+        "event.time" | "timestamp" => "Time",
+        "event.type" => "Type",
+        "emitter.class" => "Source",
+        "emitter.process.guid" => "Process",
+        "emitter.token.guid" => "Token",
+        "emitter.true-token.guid" => "Real token",
+        "event.boot.guid" | "boot_id" => "Boot",
+        "event.cpu" => "Processor",
+        "event.sequence" => "Sequence",
         "origin" => "From",
         "is_error" => "Stream",
         "message" => "Message",
@@ -50,9 +65,10 @@ pub fn field_name(field: &str) -> Option<&'static str> {
     })
 }
 
-/// A record's time, in nanoseconds since 1970 (§3.5).
+/// A record's time, in nanoseconds since 1970 (§3.5): an event's
+/// `event.time`, a log's or a metric's `timestamp`.
 pub fn timestamp(record: &Record) -> Option<i64> {
-    match record.get("timestamp")? {
+    match record.get(EVENT_TIME).or_else(|| record.get("timestamp"))? {
         Value::Signed(at) => Some(*at),
         Value::Unsigned(at) => i64::try_from(*at).ok(),
         _ => None,

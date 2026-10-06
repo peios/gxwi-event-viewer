@@ -284,7 +284,8 @@ fn grants(descriptor: &SecurityDescriptor, space: Space, names: &mut Names) -> V
 fn known_fields() -> BTreeMap<[u8; 16], String> {
     crate::words::HEADERS
         .iter()
-        .chain(["origin", "is_error", "message", "job_id", "name", "type", "value"].iter())
+        // Logs' and metrics' own, which keep the names the header had.
+        .chain(["timestamp", "boot_id", "origin", "is_error", "message", "job_id", "name", "type", "value"].iter())
         .map(|field| (access::field_guid(field), format!("its {field} field")))
         .collect()
 }

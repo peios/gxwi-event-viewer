@@ -12,6 +12,8 @@
 
 use eventd_client::text;
 
+use crate::words;
+
 /// How many records a page is.
 pub const PAGE: usize = 200;
 
@@ -92,8 +94,8 @@ impl Range {
     }
 }
 
-/// What an event came from (`origin_class`, §3.23), as the person picks it.
-pub const SOURCES: [(u8, &str); 4] = [(0, "Programs"), (1, "Kernel"), (2, "Security (KACS)"), (3, "Registry (LCS)")];
+/// What an event came from (`emitter.class`, §3.23), as the person picks it.
+pub const SOURCES: [(u8, &str); 5] = [(0, "Programs"), (1, "Kernel"), (2, "Security (KACS)"), (3, "Registry (LCS)"), (4, "Network (NTFE)")];
 
 /// What the person has chosen to see.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -150,7 +152,7 @@ impl Filter {
                     query += &format!(" SINCE {since}");
                 }
                 if let Some(source) = self.source {
-                    query += &format!(" WHERE origin_class == {source}");
+                    query += &format!(" WHERE {} == {source}", words::EMITTER_CLASS);
                 }
             }
         }
@@ -166,7 +168,12 @@ impl Filter {
     /// that very time being on the screen already.
     pub fn older(&self, timestamp: i64, shown: usize) -> String {
         let skip = if shown > 0 { format!(" SKIP {shown}") } else { String::new() };
-        format!("{} WHERE timestamp <= {timestamp}{skip} TAKE {PAGE}", self.chosen())
+        // An event's time is event.time; a log's is timestamp.
+        let time = match self.kind {
+            Kind::Logs => "timestamp",
+            Kind::Events => words::EVENT_TIME,
+        };
+        format!("{} WHERE {time} <= {timestamp}{skip} TAKE {PAGE}", self.chosen())
     }
 
     /// What may be typed in the origin or type field, from what there is in
@@ -175,7 +182,7 @@ impl Filter {
         let since = self.range.since().map(|since| format!(" SINCE {since}")).unwrap_or_default();
         match self.kind {
             Kind::Logs => format!("LOGS{since} DISTINCT origin"),
-            Kind::Events => format!("EVENTS{since} DISTINCT event_type"),
+            Kind::Events => format!("EVENTS{since} DISTINCT {}", words::EVENT_TYPE),
         }
     }
 
@@ -224,8 +231,10 @@ mod tests {
         filter.event_type = "job.*".into();
         filter.source = Some(2);
         filter.range = Range::Hour;
-        assert_eq!(filter.first_page(), "EVENTS \"job.*\" SINCE 1h ago WHERE origin_class == 2 TAKE 200 STREAM");
-        assert_eq!(filter.suggestions(), "EVENTS SINCE 1h ago DISTINCT event_type");
+        assert_eq!(filter.first_page(), "EVENTS \"job.*\" SINCE 1h ago WHERE emitter.class == 2 TAKE 200 STREAM");
+        assert_eq!(filter.suggestions(), "EVENTS SINCE 1h ago DISTINCT event.type");
+        filter.range = Range::Any;
+        assert_eq!(filter.older(1_791_017_896_125_870_148, 1), "EVENTS \"job.*\" WHERE emitter.class == 2 WHERE event.time <= 1791017896125870148 SKIP 1 TAKE 200");
     }
 
     #[test]

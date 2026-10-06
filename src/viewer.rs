@@ -379,7 +379,7 @@ impl Viewer {
         std::thread::spawn(move || {
             let field = match filter.kind {
                 Kind::Logs => "origin",
-                Kind::Events => "event_type",
+                Kind::Events => words::EVENT_TYPE,
             };
             let found: Vec<String> = eventd_client::query(&socket, &text)
                 .unwrap_or_default()
@@ -523,8 +523,8 @@ impl Viewer {
                         format!(
                             "<span class=\"when\">{}</span><span class=\"type\">{}</span><span class=\"source\">{}</span>",
                             escape(&when(row)),
-                            escape(&text(record, "event_type")),
-                            escape(&record.get("origin_class").map(words::source).unwrap_or_default()),
+                            escape(&text(record, words::EVENT_TYPE)),
+                            escape(&record.get(words::EMITTER_CLASS).map(words::source).unwrap_or_default()),
                         ),
                     ),
                 };
@@ -606,8 +606,8 @@ impl Viewer {
         };
         let record = &row.record;
         let said = |field: &str, item: &Value| match field {
-            "timestamp" => words::timestamp(record).map_or_else(|| words::value(item), |at| words::when_exactly(at, zone)),
-            "origin_class" => words::source(item),
+            "timestamp" | words::EVENT_TIME => words::timestamp(record).map_or_else(|| words::value(item), |at| words::when_exactly(at, zone)),
+            words::EMITTER_CLASS => words::source(item),
             "is_error" if *item == Value::Bool(true) => "Standard error".into(),
             "is_error" => "Standard output".into(),
             _ => words::value(item),
@@ -630,8 +630,8 @@ impl Viewer {
                 )
             }
             Kind::Events => {
-                let event_type = record.get("event_type").map(words::value).unwrap_or_default();
-                let headers: String = words::HEADERS.iter().filter(|field| **field != "event_type").filter_map(|field| record.get(*field).map(|item| fact(field, item))).collect();
+                let event_type = record.get(words::EVENT_TYPE).map(words::value).unwrap_or_default();
+                let headers: String = words::HEADERS.iter().filter(|field| **field != words::EVENT_TYPE).filter_map(|field| record.get(*field).map(|item| fact(field, item))).collect();
                 let own: String = record.iter().filter(|(field, _)| !words::HEADERS.contains(&field.as_str())).map(|(field, item)| fact(field, item)).collect();
                 let own = if own.is_empty() { String::new() } else { format!("<h3>Its fields</h3><dl>{own}</dl>") };
                 (
@@ -682,7 +682,7 @@ impl Viewer {
                 fields.set("origin", &origin.clone());
             }
             Kind::Events => {
-                let Some(Value::String(event_type)) = row.record.get("event_type") else { return };
+                let Some(Value::String(event_type)) = row.record.get(words::EVENT_TYPE) else { return };
                 fields.set("type", &event_type.clone());
             }
         }
@@ -1037,24 +1037,31 @@ mod tests {
     #[test]
     fn the_details_give_every_field() {
         let mut viewer = viewer(Kind::Events);
-        let event = record(
-            1_791_017_896_126_088_777,
-            &[
-                ("event_type", Value::String("graph.operation_terminal".into())),
-                ("origin_class", Value::Signed(0)),
-                ("service", Value::String("timed".into())),
-                ("user_sid", Value::Binary(vec![1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0])),
-            ],
-        );
+        // As eventd 0.1.11 gives a record: the header by its PGSS §6.4
+        // paths, and the payload flattened beside it.
+        let event: Record = [
+            ("event.time", Value::Signed(1_791_017_896_126_088_777)),
+            ("event.type", Value::String("peinit.graph.operation.ended".into())),
+            ("emitter.class", Value::Signed(0)),
+            ("event.sequence", Value::Unsigned(7)),
+            ("service.name", Value::String("timed".into())),
+            ("subject.token.sid", Value::Binary(vec![1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0])),
+        ]
+        .into_iter()
+        .map(|(name, value)| (name.to_string(), value))
+        .collect();
         viewer.initial(0, vec![event]);
         let id = viewer.rows[0].id;
         viewer.event("pick", &serde_json::json!({ "row": id.to_string() }), &mut Fields::default());
         let html = shown(&viewer);
-        assert!(html.contains("<h2>graph.operation_terminal</h2>"));
-        assert!(html.contains("<dt>Source<code>origin_class</code></dt><dd>Programs</dd>"));
-        assert!(html.contains("<dt>Time<code>timestamp</code></dt><dd>Saturday 3 October 2026, 08:58:16.126088777 (+00:00)</dd>"));
-        assert!(html.contains("<h3>Its fields</h3><dl><dt>service</dt><dd>timed</dd><dt>user_sid</dt><dd>S-1-5-18</dd></dl>"));
-        assert!(html.contains("<span class=\"type\">graph.operation_terminal</span><span class=\"source\">Programs</span></button>"));
+        assert!(html.contains("<h2>peinit.graph.operation.ended</h2>"));
+        assert!(html.contains("<dt>Source<code>emitter.class</code></dt><dd>Programs</dd>"));
+        assert!(html.contains("<dt>Time<code>event.time</code></dt><dd>Saturday 3 October 2026, 08:58:16.126088777 (+00:00)</dd>"));
+        assert!(html.contains("<dt>Sequence<code>event.sequence</code></dt><dd>7</dd>"));
+        assert!(html.contains("<h3>Its fields</h3><dl><dt>service.name</dt><dd>timed</dd><dt>subject.token.sid</dt><dd>S-1-5-18</dd></dl>"), "{html}");
+        // The row itself: its time, its type and where it came from.
+        assert!(html.contains("<span class=\"when\">"));
+        assert!(html.contains("<span class=\"type\">peinit.graph.operation.ended</span><span class=\"source\">Programs</span></button>"));
         // Events come first.
         assert!(html.find("fx-value-kind=\"events\"") < html.find("fx-value-kind=\"logs\""));
     }
